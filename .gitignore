@@ -3,3 +3,4 @@ logs
 docs
 .codex
 graphify-out
+core/__pycache__
