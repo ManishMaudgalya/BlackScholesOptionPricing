@@ -70,7 +70,7 @@ sigma = st.sidebar.number_input("Volatility (%)", min_value=0.01, value=float(de
 
 if live_snapshot:
     st.sidebar.info(
-        f"Synced market context: `{live_snapshot['trading_symbol']}` @ ${live_snapshot['ltp']:.2f}\n\n"
+        f"Synced market context: `{live_snapshot['trading_symbol']}` @ ₹{live_snapshot['ltp']:.2f}\n\n"
         f"Updated: {st.session_state.get('last_updated') or '—'}"
     )
 
@@ -79,7 +79,7 @@ st.markdown(
     <div class="info-card">
         <strong>Current model context</strong><br>
         <span style="color:#8ea3bc;">
-            Spot ${S:.2f} · Strike ${K:.2f} · Expiry {T:.4f} years · Volatility {sigma * 100:.2f}% ·
+            Spot ₹{S:.2f} · Strike ₹{K:.2f} · Expiry {T:.4f} years · Volatility {sigma * 100:.2f}% ·
             Option side {selected_side.upper()}
         </span>
     </div>
@@ -94,8 +94,8 @@ model_greeks = bs_greeks(S, K, T, r, sigma)
 st.markdown('<div class="section-header">Option Prices</div>', unsafe_allow_html=True)
 price_cols = st.columns(3)
 price_cards = [
-    ("Call Price", f"${call_price:.4f}", "#59e0a2"),
-    ("Put Price", f"${put_price:.4f}", "#ff8d7c"),
+    ("Call Price", f"₹{call_price:.4f}", "#59e0a2"),
+    ("Put Price", f"₹{put_price:.4f}", "#ff8d7c"),
     ("Put-Call Parity Δ", f"{call_price - put_price - (S - K * np.exp(-r * T)):.6f}", "#ffd166"),
 ]
 for col, (label, value, color) in zip(price_cols, price_cards):

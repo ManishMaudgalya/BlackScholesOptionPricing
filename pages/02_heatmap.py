@@ -148,9 +148,9 @@ else:
         data=go.Heatmap(
             z=prices,
             x=[f"{vol * 100:.1f}%" for vol in vols],
-            y=[f"${strike:.1f}" for strike in strikes],
+            y=[f"₹{strike:.1f}" for strike in strikes],
             colorscale="Viridis",
-            hovertemplate="<b>Vol</b> %{x}<br><b>Strike</b> %{y}<br><b>Price</b> $%{z:.4f}<extra></extra>",
+            hovertemplate="<b>Vol</b> %{x}<br><b>Strike</b> %{y}<br><b>Price</b> ₹%{z:.4f}<extra></extra>",
         )
     )
     fig.update_layout(

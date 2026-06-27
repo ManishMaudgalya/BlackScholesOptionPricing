@@ -60,7 +60,7 @@ else:
 
     cols = st.columns(4)
     cards = [
-        ("Last Traded Price", f"${snapshot['ltp']:.2f}", "#55d6ff"),
+        ("Last Traded Price", f"₹{snapshot['ltp']:.2f}", "#55d6ff"),
         ("Net Change", f"{change_symbol} {snapshot['net_change']:.2f}", change_color),
         ("Volume", f"{snapshot['trade_volume']:,.0f}", "#ffd166"),
         ("Open Interest", f"{snapshot['open_interest']:,.0f}", "#8dc9ff"),
@@ -81,8 +81,8 @@ else:
     summaries = [
         ("Symbol", snapshot["trading_symbol"]),
         ("Exchange", snapshot["exchange"]),
-        ("Open / High", f"${snapshot['open']:.2f} / ${snapshot['high']:.2f}"),
-        ("Low / Close", f"${snapshot['low']:.2f} / ${snapshot['close']:.2f}"),
+        ("Open / High", f"₹{snapshot['open']:.2f} / ₹{snapshot['high']:.2f}"),
+        ("Low / Close", f"₹{snapshot['low']:.2f} / ₹{snapshot['close']:.2f}"),
         ("% Change", f"{snapshot['percent_change']:.2f}%"),
     ]
     for col, (label, value) in zip(summary_cols, summaries):
@@ -121,11 +121,11 @@ else:
 
     with meta_col:
         meta_cards = [
-            ("Avg Price", f"${snapshot['avg_price']:.2f}"),
+            ("Avg Price", f"₹{snapshot['avg_price']:.2f}"),
             ("Feed Time", snapshot.get("exchange_feed_time") or "—"),
             ("Trade Time", snapshot.get("exchange_trade_time") or "—"),
-            ("52W Range", f"${snapshot['week_52_low']:.2f} → ${snapshot['week_52_high']:.2f}"),
-            ("Circuit Band", f"${snapshot['lower_circuit']:.2f} → ${snapshot['upper_circuit']:.2f}"),
+            ("52W Range", f"₹{snapshot['week_52_low']:.2f} → ₹{snapshot['week_52_high']:.2f}"),
+            ("Circuit Band", f"₹{snapshot['lower_circuit']:.2f} → ₹{snapshot['upper_circuit']:.2f}"),
         ]
         for label, value in meta_cards:
             st.markdown(
