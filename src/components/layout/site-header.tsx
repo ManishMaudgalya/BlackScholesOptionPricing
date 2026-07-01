@@ -16,6 +16,7 @@ export function SiteHeader({ session }: SiteHeaderProps) {
 
         <nav className="site-nav">
           <Link href="/">Dashboard</Link>
+          {session?.user ? <Link href="/portfolio">Portfolio</Link> : null}
           {session?.user ? <Link href="/profile">Profile</Link> : null}
         </nav>
 

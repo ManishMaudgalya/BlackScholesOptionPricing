@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { connectToDatabase } from "@/lib/db/mongodb";
 import { MarketDataSnapshotModel } from "@/lib/db/models/market-data-snapshot";
-import { fetchYahooHistoricalData } from "@/lib/services/yahoo-finance";
+import { pullLatestMarketDataSnapshot } from "@/lib/engines/market-data-engine";
+import type { StoredMarketDataSnapshot } from "@/lib/services/market-data";
 
 const DEFAULT_SYMBOL = "AAPL";
 
@@ -59,8 +60,14 @@ export async function POST(request: Request) {
   const interval = typeof body.interval === "string" && body.interval.trim() ? body.interval.trim() : "1d";
 
   try {
-    const snapshot = await fetchYahooHistoricalData(symbol, { range, interval });
     await connectToDatabase();
+    const existingSnapshot = await MarketDataSnapshotModel.findOne({
+      authUserId: session.user.id,
+      symbol,
+    })
+      .sort({ updatedAt: -1 })
+      .lean<StoredMarketDataSnapshot | null>();
+    const snapshot = await pullLatestMarketDataSnapshot(symbol, { range, interval }, existingSnapshot);
 
     const savedSnapshot = await MarketDataSnapshotModel.findOneAndUpdate(
       {

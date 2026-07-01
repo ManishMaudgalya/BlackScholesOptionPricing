@@ -1,33 +1,12 @@
+import {
+  computeAnnualizedReturn,
+  computeRealizedVolatility,
+  normalizeNumber,
+  normalizeSymbol,
+  type MarketDataSnapshot,
+} from "@/lib/services/market-data";
+
 const YAHOO_FINANCE_CHART_ROOT = "https://query1.finance.yahoo.com/v8/finance/chart";
-
-export type YahooHistoricalPoint = {
-  date: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-};
-
-export type MarketDataSnapshot = {
-  symbol: string;
-  shortName: string;
-  currency: string;
-  exchangeName: string;
-  instrumentType: string;
-  timezone: string;
-  range: string;
-  interval: string;
-  source: "yahoo-finance";
-  latestClose: number;
-  latestCloseAt: string;
-  previousClose: number | null;
-  regularMarketPrice: number | null;
-  realizedVolatility: number;
-  annualizedReturn: number;
-  fetchedAt: string;
-  points: YahooHistoricalPoint[];
-};
 
 type YahooChartResponse = {
   chart?: {
@@ -59,41 +38,6 @@ type YahooChartResponse = {
     };
   };
 };
-
-function normalizeNumber(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function normalizeSymbol(symbol: string) {
-  return symbol.trim().toUpperCase();
-}
-
-function computeAnnualizedReturn(closes: number[]) {
-  if (closes.length < 2) {
-    return 0;
-  }
-
-  const logReturns = closes.slice(1).map((close, index) => Math.log(close / closes[index]));
-  const averageReturn = logReturns.reduce((sum, value) => sum + value, 0) / logReturns.length;
-  return averageReturn * 252;
-}
-
-function computeRealizedVolatility(closes: number[]) {
-  if (closes.length < 2) {
-    return 0;
-  }
-
-  const logReturns = closes.slice(1).map((close, index) => Math.log(close / closes[index]));
-  if (logReturns.length < 2) {
-    return 0;
-  }
-
-  const mean = logReturns.reduce((sum, value) => sum + value, 0) / logReturns.length;
-  const variance =
-    logReturns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (logReturns.length - 1);
-
-  return Math.sqrt(variance) * Math.sqrt(252);
-}
 
 export async function fetchYahooHistoricalData(
   rawSymbol: string,
@@ -183,6 +127,7 @@ export async function fetchYahooHistoricalData(
     latestCloseAt: latestPoint.date,
     previousClose: normalizeNumber(meta.previousClose),
     regularMarketPrice: normalizeNumber(meta.regularMarketPrice) ?? latestPoint.close,
+    priceMode: "live",
     realizedVolatility: computeRealizedVolatility(closeSeries),
     annualizedReturn: computeAnnualizedReturn(closeSeries),
     fetchedAt: new Date().toISOString(),

@@ -30,6 +30,7 @@ const marketDataSnapshotSchema = new Schema(
     latestCloseAt: { type: Date, required: true },
     previousClose: { type: Number, default: null },
     regularMarketPrice: { type: Number, default: null },
+    priceMode: { type: String, default: "live" },
     realizedVolatility: { type: Number, required: true },
     annualizedReturn: { type: Number, required: true },
     fetchedAt: { type: Date, required: true },
