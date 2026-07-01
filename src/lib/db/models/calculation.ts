@@ -28,6 +28,16 @@ const calculationSchema = new Schema(
         rhoPut: { type: Number, required: true },
       },
     },
+    marketData: {
+      symbol: { type: String, default: "" },
+      shortName: { type: String, default: "" },
+      source: { type: String, default: "" },
+      currency: { type: String, default: "USD" },
+      latestClose: { type: Number, default: null },
+      latestCloseAt: { type: Date, default: null },
+      realizedVolatility: { type: Number, default: null },
+      fetchedAt: { type: Date, default: null },
+    },
   },
   {
     timestamps: true,

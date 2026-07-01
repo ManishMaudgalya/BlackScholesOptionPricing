@@ -1,14 +1,15 @@
 # Black-Scholes Option Pricing Webapp
 
-This repository is now a `Next.js` application only. The old Streamlit app has been removed.
+This repository is a `Next.js` application for Black-Scholes pricing, Greeks analysis, and MongoDB-backed
+persistence.
 
 The app provides:
 
 - Google sign-in for user accounts
-- MongoDB-backed user profiles
+- Yahoo Finance historical data refreshes for market inputs
+- MongoDB-backed market snapshots per user and symbol
 - User-scoped saved Black-Scholes calculations
-- A profile page for AngelOne API configuration
-- Server-side AngelOne login from the signed-in user profile
+- A profile page for account details
 
 ## Stack
 
@@ -18,6 +19,7 @@ The app provides:
 - `MongoDB`
 - `Mongoose`
 - `Auth.js` with Google OAuth and JWT sessions
+- Yahoo Finance chart API for daily historical prices
 
 ## Environment variables
 
@@ -74,35 +76,20 @@ http://localhost:3000
 ## How to use the app
 
 1. Sign in with Google.
-2. Use the dashboard to calculate option prices and Greeks.
-3. Save scenarios to MongoDB.
-4. Open `/profile`.
-5. Save your AngelOne API key, client code, and SmartAPI header fields.
-6. Enter your AngelOne password and TOTP when you want to authenticate.
-7. The app stores the issued AngelOne session tokens in your user profile, but it does not store the password or TOTP.
-
-## Notes on AngelOne profile login
-
-- The profile persists:
-  - API key
-  - client code
-  - client local IP
-  - client public IP
-  - MAC address
-  - returned AngelOne session tokens
-- The profile does not persist:
-  - password
-  - TOTP code
+2. Enter a Yahoo Finance symbol such as `AAPL` or `RELIANCE.NS`.
+3. Click `Refresh Yahoo Data`.
+4. The app pulls the latest available daily history, stores it in MongoDB, and applies the latest close and
+   annualized realized volatility to the pricing inputs.
+5. Adjust strike, expiry, rate, or side as needed.
+6. Click `Save to MongoDB` to persist the calculation and its market-data context.
 
 ## Main routes
 
 - `/` - pricing dashboard
-- `/profile` - Google-backed user profile and AngelOne login page
+- `/profile` - signed-in account summary
 - `/api/auth/*` - Auth.js handlers
 - `/api/calculations` - user-scoped saved calculations
-- `/api/profile` - persisted AngelOne profile settings
-- `/api/angelone/connect` - login to AngelOne
-- `/api/angelone/disconnect` - clear saved AngelOne session
+- `/api/market-data` - Yahoo Finance refresh and stored market snapshots
 
 ## Available scripts
 
@@ -129,7 +116,7 @@ The notebook:
 
 - reads `MONGODB_URI` from `.env.local` by default
 - uses `MONGODB_DB_NAME` when the URI does not include a database path
-- creates the `calculations` and `userprofiles` collections if they do not exist
+- creates the collections used by the app if they do not exist
 - applies JSON schema validators
 - creates the indexes used by the app
 

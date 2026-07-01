@@ -11,6 +11,16 @@ type CreateCalculationBody = {
   riskFreeRate: number;
   volatility: number;
   optionType: "call" | "put";
+  marketData?: {
+    symbol?: string;
+    shortName?: string;
+    source?: string;
+    currency?: string;
+    latestClose?: number;
+    latestCloseAt?: string;
+    realizedVolatility?: number;
+    fetchedAt?: string;
+  };
 };
 
 function normalizeNumber(value: unknown, field: string) {
@@ -19,6 +29,10 @@ function normalizeNumber(value: unknown, field: string) {
     throw new Error(`Invalid numeric field: ${field}`);
   }
   return parsed;
+}
+
+function normalizeString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export async function GET() {
@@ -59,6 +73,25 @@ export async function POST(request: Request) {
       volatility: normalizeNumber(body.volatility, "volatility"),
       optionType,
     };
+    const marketData = body.marketData
+      ? {
+          symbol: normalizeString(body.marketData.symbol),
+          shortName: normalizeString(body.marketData.shortName),
+          source: normalizeString(body.marketData.source),
+          currency: normalizeString(body.marketData.currency) || "USD",
+          latestClose:
+            typeof body.marketData.latestClose === "number" && Number.isFinite(body.marketData.latestClose)
+              ? body.marketData.latestClose
+              : null,
+          latestCloseAt: normalizeString(body.marketData.latestCloseAt) || null,
+          realizedVolatility:
+            typeof body.marketData.realizedVolatility === "number" &&
+            Number.isFinite(body.marketData.realizedVolatility)
+              ? body.marketData.realizedVolatility
+              : null,
+          fetchedAt: normalizeString(body.marketData.fetchedAt) || null,
+        }
+      : undefined;
 
     const prices = {
       call: blackScholesPrice(
@@ -93,6 +126,7 @@ export async function POST(request: Request) {
       userEmail: session.user.email ?? "",
       inputs,
       results: { prices, greeks },
+      marketData,
     });
 
     return NextResponse.json({ calculation }, { status: 201 });
