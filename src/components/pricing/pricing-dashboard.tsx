@@ -44,6 +44,7 @@ type CalculationRecord = {
     latestCloseAt?: string | null;
     realizedVolatility?: number | null;
     fetchedAt?: string | null;
+    regularMarketPrice?: number | null;
   };
   createdAt: string;
 };
@@ -62,6 +63,7 @@ type MarketDataSnapshot = {
   latestCloseAt: string;
   previousClose: number | null;
   regularMarketPrice: number | null;
+  priceMode?: "live" | "delayed" | "close";
   realizedVolatility: number;
   annualizedReturn: number;
   fetchedAt: string;
@@ -109,6 +111,8 @@ const formatDate = (value: string) =>
     timeStyle: "short",
   }).format(new Date(value));
 
+const formatSignedPercent = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+
 function MetricCard({
   label,
   value,
@@ -145,6 +149,15 @@ export function PricingDashboard({ user }: { user: UserData }) {
   const volatility = form.volatilityPercent / 100;
   const normalizedMarketSymbol = marketSymbolInput.trim().toUpperCase() || DEFAULT_SYMBOL;
   const activeCurrency = marketData?.currency || "USD";
+  const liveOrClosePrice = marketData?.regularMarketPrice ?? marketData?.latestClose ?? null;
+  const marketFeedLabel =
+    marketData?.source === "massive"
+      ? marketData.priceMode === "delayed"
+        ? "MASSIVE DELAYED"
+        : marketData.priceMode === "close"
+          ? "MASSIVE CLOSE"
+          : "MASSIVE LIVE"
+      : marketData?.source?.toUpperCase() ?? "IDLE";
 
   const analytics = useMemo(() => {
     const callPrice = blackScholesPrice(
@@ -214,14 +227,11 @@ export function PricingDashboard({ user }: { user: UserData }) {
       strikeOffsets,
       volValues,
       cells: prices.map((row, rowIndex) =>
-        row.map((value, columnIndex) => {
-          const normalized = max === min ? 0.5 : (value - min) / (max - min);
-          return {
-            id: `${rowIndex}-${columnIndex}`,
-            value,
-            normalized,
-          };
-        }),
+        row.map((value, columnIndex) => ({
+          id: `${rowIndex}-${columnIndex}`,
+          value,
+          normalized: max === min ? 0.5 : (value - min) / (max - min),
+        })),
       ),
     };
   }, [form.optionType, form.spotPrice, form.timeToExpiry, riskFreeRate]);
@@ -235,8 +245,8 @@ export function PricingDashboard({ user }: { user: UserData }) {
     });
   }, []);
 
-  function applyMarketSnapshot(snapshot: MarketDataSnapshot, message: string) {
-    const latestClose = Number(snapshot.latestClose.toFixed(2));
+  function applyMarketSnapshot(snapshot: MarketDataSnapshot, message?: string) {
+    const appliedPrice = snapshot.regularMarketPrice ?? snapshot.latestClose;
     const volatilityPercent = Number((snapshot.realizedVolatility * 100).toFixed(2));
 
     setMarketData(snapshot);
@@ -247,12 +257,14 @@ export function PricingDashboard({ user }: { user: UserData }) {
 
       return {
         ...current,
-        spotPrice: latestClose,
-        strikePrice: shouldSyncStrike ? latestClose : current.strikePrice,
+        spotPrice: Number(appliedPrice.toFixed(2)),
+        strikePrice: shouldSyncStrike ? Number(appliedPrice.toFixed(2)) : current.strikePrice,
         volatilityPercent,
       };
     });
-    setMarketMessage(message);
+    if (typeof message === "string") {
+      setMarketMessage(message);
+    }
   }
 
   async function loadStoredMarketData(symbol: string) {
@@ -268,11 +280,11 @@ export function PricingDashboard({ user }: { user: UserData }) {
 
       if (!payload.snapshot) {
         setMarketData(null);
-        setMarketMessage(`No saved Yahoo Finance snapshot for ${symbol}. Refresh to pull the latest available data.`);
+        setMarketMessage(`No saved market snapshot for ${symbol}. Refresh to pull the latest data.`);
         return;
       }
 
-      applyMarketSnapshot(payload.snapshot, `Loaded saved ${payload.snapshot.symbol} market history from MongoDB.`);
+      applyMarketSnapshot(payload.snapshot, `Loaded saved ${payload.snapshot.symbol} data from MongoDB.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load saved market data.";
       setMarketMessage(message);
@@ -312,15 +324,21 @@ export function PricingDashboard({ user }: { user: UserData }) {
 
           const payload = (await response.json()) as { snapshot?: MarketDataSnapshot; error?: string };
           if (!response.ok || !payload.snapshot) {
-            throw new Error(payload.error ?? "Unable to refresh Yahoo Finance data.");
+            throw new Error(payload.error ?? "Unable to refresh market data.");
           }
 
           applyMarketSnapshot(
             payload.snapshot,
-            `Refreshed ${payload.snapshot.symbol} from Yahoo Finance and stored the snapshot in MongoDB.`,
+            payload.snapshot.source === "massive"
+              ? payload.snapshot.priceMode === "delayed"
+                ? `Refreshed ${payload.snapshot.symbol} from Massive delayed aggregate data and stored it in MongoDB.`
+                : payload.snapshot.priceMode === "close"
+                  ? `Refreshed ${payload.snapshot.symbol} from Massive closing data and stored it in MongoDB.`
+                  : `Refreshed ${payload.snapshot.symbol} from Massive live U.S. stock data and stored it in MongoDB.`
+              : `Refreshed ${payload.snapshot.symbol} from Yahoo Finance and stored it in MongoDB.`,
           );
         } catch (error) {
-          const message = error instanceof Error ? error.message : "Unable to refresh Yahoo Finance data.";
+          const message = error instanceof Error ? error.message : "Unable to refresh market data.";
           setMarketMessage(message);
         }
       })();
@@ -355,6 +373,7 @@ export function PricingDashboard({ user }: { user: UserData }) {
                     latestCloseAt: marketData.latestCloseAt,
                     realizedVolatility: marketData.realizedVolatility,
                     fetchedAt: marketData.fetchedAt,
+                    regularMarketPrice: marketData.regularMarketPrice,
                   }
                 : undefined,
             }),
@@ -391,35 +410,32 @@ export function PricingDashboard({ user }: { user: UserData }) {
   ] as const;
 
   return (
-    <main className="page-shell">
-      <section className="hero">
+    <main className="page-shell terminal-shell">
+      <section className="hero hero-terminal">
         <div>
-          <p className="kicker">Black-Scholes web terminal</p>
-          <h1>Option pricing with Yahoo Finance history and MongoDB-backed market snapshots.</h1>
+          <p className="kicker">Pricing Monitor</p>
+          <h1>Black-Scholes analytics with Massive-backed U.S. stock pricing.</h1>
           <p className="hero-copy">
-            Refresh the latest daily history for any Yahoo Finance symbol, apply the newest close and realized
-            volatility to the model, and persist both the market snapshot and the resulting calculation in
-            MongoDB under your signed-in account.
+            Use Massive for U.S. equity pricing and Yahoo Finance for other markets, persist refreshed
+            snapshots to MongoDB, and save option scenarios tied to your signed-in account.
           </p>
         </div>
 
         <div className="hero-panel">
           <div>
-            <span className="panel-label">Selected side</span>
-            <strong>{form.optionType.toUpperCase()}</strong>
+            <span className="panel-label">Feed</span>
+            <strong>{marketFeedLabel}</strong>
           </div>
           <div>
-            <span className="panel-label">Market symbol</span>
+            <span className="panel-label">Symbol</span>
             <strong>{marketData?.symbol ?? normalizedMarketSymbol}</strong>
           </div>
           <div>
-            <span className="panel-label">Latest close</span>
-            <strong>
-              {marketData ? formatCurrency(marketData.latestClose, marketData.currency) : "Not loaded"}
-            </strong>
+            <span className="panel-label">Marked Price</span>
+            <strong>{liveOrClosePrice === null ? "Not loaded" : formatCurrency(liveOrClosePrice, activeCurrency)}</strong>
           </div>
           <div>
-            <span className="panel-label">Signed in</span>
+            <span className="panel-label">User</span>
             <strong>{user.email ?? user.name ?? "User"}</strong>
           </div>
         </div>
@@ -428,12 +444,12 @@ export function PricingDashboard({ user }: { user: UserData }) {
       <section className="layout-grid">
         <aside className="control-panel">
           <div className="panel-heading">
-            <p className="kicker">Inputs</p>
+            <p className="kicker">Market Input</p>
             <h2>Pricing controls</h2>
           </div>
 
           <label>
-            Yahoo Finance Symbol
+            Ticker
             <input
               type="text"
               value={marketSymbolInput}
@@ -443,8 +459,14 @@ export function PricingDashboard({ user }: { user: UserData }) {
           </label>
 
           <div className="action-row">
-            <button type="button" onClick={refreshMarketData} disabled={isMarketPending}>
-              {isMarketPending ? "Refreshing..." : "Refresh Yahoo Data"}
+            <button
+              type="button"
+              onClick={() => {
+                void refreshMarketData();
+              }}
+              disabled={isMarketPending}
+            >
+              {isMarketPending ? "Refreshing..." : "Refresh Market"}
             </button>
             <button
               type="button"
@@ -529,7 +551,7 @@ export function PricingDashboard({ user }: { user: UserData }) {
 
           <div className="action-row">
             <button type="button" onClick={saveCalculation} disabled={isSavePending}>
-              {isSavePending ? "Saving..." : "Save to MongoDB"}
+              {isSavePending ? "Saving..." : "Save Scenario"}
             </button>
             <button
               type="button"
@@ -546,19 +568,27 @@ export function PricingDashboard({ user }: { user: UserData }) {
           </div>
 
           <p className="helper-text">
-            Refresh pulls the latest daily history currently available from Yahoo Finance, stores it in MongoDB,
-            and applies the latest close plus annualized realized volatility to the model inputs.
+            U.S. symbols like `AAPL` use Massive. If your Massive plan does not include live snapshots, the app falls
+            back to delayed aggregate or latest-close data instead of failing the refresh.
           </p>
           {marketData ? (
             <p className="helper-text">
-              {marketData.shortName} on {marketData.exchangeName} last closed at{" "}
-              {formatCurrency(marketData.latestClose, marketData.currency)} on {formatDate(marketData.latestCloseAt)}.
+              {marketData.symbol} last updated at {formatDate(marketData.latestCloseAt)} with annualized realized
+              volatility of {(marketData.realizedVolatility * 100).toFixed(2)}%.
+            </p>
+          ) : null}
+          {marketData?.source === "massive" && marketData.priceMode !== "live" ? (
+            <p className="helper-text">
+              Current Massive feed mode: {marketData.priceMode === "delayed" ? "delayed aggregate data" : "latest close only"}.
             </p>
           ) : null}
           {marketData ? (
             <p className="helper-text">
-              Historical volatility applied: {(marketData.realizedVolatility * 100).toFixed(2)}% annualized from{" "}
-              {marketData.points.length} daily observations.
+              Intraday move versus prior close:{" "}
+              {marketData.previousClose === null
+                ? "Unavailable"
+                : formatSignedPercent((((liveOrClosePrice ?? marketData.latestClose) - marketData.previousClose) / marketData.previousClose) * 100)}
+              .
             </p>
           ) : null}
           {marketMessage ? <p className="feedback">{marketMessage}</p> : null}
@@ -575,10 +605,18 @@ export function PricingDashboard({ user }: { user: UserData }) {
             />
             <MetricCard label="Put Price" value={formatCurrency(analytics.putPrice, activeCurrency)} accent="red" />
             <MetricCard
-              label="Put-Call Parity Gap"
-              value={analytics.parityGap.toFixed(6)}
-              note="Should stay near zero for stable inputs"
-              accent="gold"
+              label="Live Spot"
+              value={liveOrClosePrice === null ? "Not loaded" : formatCurrency(liveOrClosePrice, activeCurrency)}
+              note={
+                marketData?.source === "massive"
+                  ? marketData.priceMode === "delayed"
+                    ? "Massive delayed aggregate feed"
+                    : marketData.priceMode === "close"
+                      ? "Massive latest close"
+                      : "Massive real-time snapshot"
+                  : "Latest stored market close"
+              }
+              accent="cyan"
             />
           </section>
 
@@ -616,7 +654,7 @@ export function PricingDashboard({ user }: { user: UserData }) {
                       key={cell.id}
                       className="heatmap-cell"
                       style={{
-                        background: `linear-gradient(180deg, rgba(85,214,255,${0.18 + cell.normalized * 0.65}), rgba(89,224,162,${0.12 + cell.normalized * 0.5}))`,
+                        background: `rgba(255, 145, 0, ${0.14 + cell.normalized * 0.42})`,
                       }}
                       title={`${form.optionType.toUpperCase()} price: ${cell.value.toFixed(4)}`}
                     >
@@ -637,8 +675,8 @@ export function PricingDashboard({ user }: { user: UserData }) {
               <div className="metrics-grid compact">
                 <MetricCard label="d1" value={Number.isFinite(analytics.d1) ? analytics.d1.toFixed(6) : "—"} />
                 <MetricCard label="d2" value={Number.isFinite(analytics.d2) ? analytics.d2.toFixed(6) : "—"} />
-                <MetricCard label="Risk-free rate" value={`${form.riskFreeRatePercent.toFixed(2)}%`} />
-                <MetricCard label="Volatility" value={`${form.volatilityPercent.toFixed(2)}%`} />
+                <MetricCard label="Risk-Free Rate" value={`${form.riskFreeRatePercent.toFixed(2)}%`} />
+                <MetricCard label="Parity Gap" value={analytics.parityGap.toFixed(6)} accent="gold" />
               </div>
             </article>
 
@@ -649,9 +687,7 @@ export function PricingDashboard({ user }: { user: UserData }) {
               </div>
               <div className="history-list">
                 {savedCalculations.length === 0 ? (
-                  <p className="empty-state">
-                    No saved calculations yet. Refresh a Yahoo Finance symbol, then save a scenario.
-                  </p>
+                  <p className="empty-state">No saved calculations yet. Refresh a symbol, then save a scenario.</p>
                 ) : (
                   savedCalculations.map((item) => (
                     <article key={item._id} className="history-card">
@@ -665,9 +701,8 @@ export function PricingDashboard({ user }: { user: UserData }) {
                         {(item.inputs.volatility * 100).toFixed(2)}%
                       </p>
                       <p>
-                        Call{" "}
-                        {formatCurrency(item.results.prices.call, item.marketData?.currency || activeCurrency)} · Put{" "}
-                        {formatCurrency(item.results.prices.put, item.marketData?.currency || activeCurrency)}
+                        Call {formatCurrency(item.results.prices.call, item.marketData?.currency || activeCurrency)} ·
+                        Put {formatCurrency(item.results.prices.put, item.marketData?.currency || activeCurrency)}
                       </p>
                     </article>
                   ))

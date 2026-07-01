@@ -11,10 +11,10 @@ export function ProfilePanel({ user }: { user: UserData }) {
       <section className="hero">
         <div>
           <p className="kicker">Account</p>
-          <h1>Google-backed access for saved calculations and Yahoo market snapshots.</h1>
+          <h1>Google-backed access for saved calculations, portfolio holdings, and market snapshots.</h1>
           <p className="hero-copy">
-            This app no longer stores Angel One credentials. Sign in with Google, refresh Yahoo Finance history on
-            the dashboard, and keep both market snapshots and Black-Scholes calculations in MongoDB.
+            Sign in with Google, refresh Massive data for U.S. stocks or Yahoo Finance data for international symbols,
+            and keep both market snapshots and Black-Scholes calculations in MongoDB.
           </p>
         </div>
 
@@ -29,7 +29,7 @@ export function ProfilePanel({ user }: { user: UserData }) {
           </div>
           <div>
             <span className="panel-label">Market data source</span>
-            <strong>Yahoo Finance</strong>
+            <strong>Massive + Yahoo</strong>
           </div>
           <div>
             <span className="panel-label">Persistence</span>
@@ -50,8 +50,8 @@ export function ProfilePanel({ user }: { user: UserData }) {
             <p className="profile-name">{user.name ?? "User"}</p>
             <p className="profile-email">{user.email ?? "—"}</p>
             <p className="helper-text">
-              Use the dashboard refresh button to pull the latest available daily history for a Yahoo Finance
-              symbol. The app stores that snapshot in MongoDB before applying it to the pricing model.
+              Use the dashboard and portfolio refresh actions to store new market snapshots in MongoDB before they
+              are applied to pricing or portfolio valuation.
             </p>
           </div>
         </div>

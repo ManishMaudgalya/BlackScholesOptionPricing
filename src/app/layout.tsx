@@ -5,9 +5,9 @@ import { SiteHeader } from "@/components/layout/site-header";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Black-Scholes Option Pricing Webapp",
+  title: "Black-Scholes Terminal",
   description:
-    "A Next.js option pricing dashboard with Black-Scholes analytics, Yahoo Finance history refreshes, and MongoDB-backed persistence.",
+    "A Bloomberg-style Black-Scholes terminal with Massive U.S. stock data, Yahoo Finance international coverage, and MongoDB-backed persistence.",
 };
 
 export default async function RootLayout({
