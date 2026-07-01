@@ -3,5 +3,10 @@ logs
 docs
 .codex
 graphify-out
-core/__pycache__
 AGENTS.md
+node_modules
+.next
+.env.local
+__pycache__
+.DS_Store
+.ipynb_checkpoints
