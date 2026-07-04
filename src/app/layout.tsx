@@ -4,6 +4,8 @@ import { AppSessionProvider } from "@/components/layout/session-provider";
 import { SiteHeader } from "@/components/layout/site-header";
 import "./globals.css";
 
+export const runtime = "nodejs";
+
 export const metadata: Metadata = {
   title: "Black-Scholes Terminal",
   description:

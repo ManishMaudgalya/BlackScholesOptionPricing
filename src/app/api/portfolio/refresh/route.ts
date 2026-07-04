@@ -3,26 +3,12 @@ import { auth } from "@/auth";
 import { MarketDataSnapshotModel } from "@/lib/db/models/market-data-snapshot";
 import { PortfolioPositionModel } from "@/lib/db/models/portfolio-position";
 import { connectToDatabase } from "@/lib/db/mongodb";
-import { buildPortfolio } from "@/lib/portfolio/build-portfolio";
-import type { PortfolioPositionRecord, StoredMarketDataSnapshot } from "@/lib/portfolio/types";
+import { ensurePortfolioAccount, loadPortfolioForUser } from "@/lib/portfolio/store";
 import { pullLatestMarketDataSnapshot } from "@/lib/engines/market-data-engine";
 import type { StoredMarketDataSnapshot as ServiceStoredMarketDataSnapshot } from "@/lib/services/market-data";
 
-async function loadPortfolioForUser(authUserId: string) {
-  const positions = await PortfolioPositionModel.find({ authUserId })
-    .sort({ createdAt: -1 })
-    .lean<PortfolioPositionRecord[]>();
-  const symbols = Array.from(new Set(positions.map((position) => position.symbol)));
-  const snapshots =
-    symbols.length === 0
-      ? []
-      : await MarketDataSnapshotModel.find({
-          authUserId,
-          symbol: { $in: symbols },
-        }).lean<StoredMarketDataSnapshot[]>();
-
-  return buildPortfolio(positions, snapshots);
-}
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
 export async function POST() {
   const session = await auth();
@@ -33,6 +19,7 @@ export async function POST() {
 
   try {
     await connectToDatabase();
+    await ensurePortfolioAccount(authUserId, session.user.email);
     const symbols = await PortfolioPositionModel.find({ authUserId }).distinct("symbol");
     const existingSnapshots =
       symbols.length === 0
@@ -45,7 +32,7 @@ export async function POST() {
 
     if (symbols.length === 0) {
       return NextResponse.json({
-        portfolio: await loadPortfolioForUser(authUserId),
+        portfolio: await loadPortfolioForUser(authUserId, session.user.email),
         refreshedCount: 0,
         failedSymbols: [],
       });
@@ -80,7 +67,7 @@ export async function POST() {
     );
 
     return NextResponse.json({
-      portfolio: await loadPortfolioForUser(authUserId),
+      portfolio: await loadPortfolioForUser(authUserId, session.user.email),
       refreshedCount: refreshResults.length - failedSymbols.length,
       failedSymbols,
     });

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import type { PortfolioState } from "@/lib/portfolio/types";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { DEFAULT_PORTFOLIO_SECTOR_ID, PORTFOLIO_SECTOR_MODELS, type PortfolioSectorId } from "@/lib/portfolio/sector-presets";
+import type { PortfolioHolding, PortfolioRisk, PortfolioState } from "@/lib/portfolio/types";
+import type { MarketDataSnapshot } from "@/lib/services/market-data";
 
 type UserData = {
   id?: string;
@@ -16,12 +18,25 @@ type PortfolioFormState = {
   purchasePrice: string;
 };
 
+type SectorFormState = {
+  sector: PortfolioSectorId;
+  budget: string;
+};
+
 type PortfolioPayload = {
   portfolio?: PortfolioState;
   error?: string;
   refreshError?: string;
   refreshedCount?: number;
   failedSymbols?: string[];
+  spentCash?: number;
+  purchasedSymbols?: string[];
+  sectorLabel?: string;
+};
+
+type HistoryPayload = {
+  snapshot?: MarketDataSnapshot;
+  error?: string;
 };
 
 const DEFAULT_SYMBOL = "AAPL";
@@ -32,21 +47,54 @@ const initialPortfolioForm: PortfolioFormState = {
   purchasePrice: "100",
 };
 
+const initialSectorForm: SectorFormState = {
+  sector: DEFAULT_PORTFOLIO_SECTOR_ID,
+  budget: "25000",
+};
+
 const emptyPortfolio: PortfolioState = {
   holdings: [],
+  account: {
+    currency: "USD",
+    startingCash: 100000,
+    cashBalance: 100000,
+  },
   summary: {
     holdingsCount: 0,
     symbolsCount: 0,
     totalCostBasis: 0,
     pricedCostBasis: 0,
     totalCurrentValue: 0,
+    totalEquity: 100000,
     unrealizedGainLoss: 0,
     unrealizedGainLossPercent: 0,
     pricedHoldingsCount: 0,
     pendingHoldingsCount: 0,
+    cashUtilizationPercent: 0,
     currencies: [],
     displayCurrency: null,
     isCurrencyMixed: false,
+  },
+  risk: {
+    portfolioValue: 0,
+    dailyVolatility: 0,
+    annualizedVolatility: 0,
+    valueAtRisk95: 0,
+    valueAtRisk99: 0,
+    expectedShortfall95: 0,
+    concentration: 0,
+    weightedRealizedVolatility: 0,
+    weightedAnnualizedReturn: 0,
+    lookbackDays: 0,
+    marketCondition: "data-limited",
+    topHoldingSymbol: null,
+    topHoldingWeight: 0,
+    worstDailyReturn: null,
+    bestDailyReturn: null,
+    fxPairsUsed: [],
+    drivers: ["Build a portfolio first to unlock the VaR model."],
+    methodology:
+      "Historical simulation needs enough priced return history in a single reporting currency before VaR is reliable.",
   },
 };
 
@@ -64,13 +112,70 @@ const formatPlainNumber = (value: number) =>
     maximumFractionDigits: 2,
   }).format(value);
 
+const formatSignedCurrency = (value: number, currency = "USD") =>
+  `${value >= 0 ? "+" : "-"}${formatCurrency(Math.abs(value), currency)}`;
+
 const formatSignedPercent = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+const formatRatioPercent = (value: number) => `${(value * 100).toFixed(2)}%`;
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+
+function formatMarketCondition(condition: PortfolioRisk["marketCondition"]) {
+  switch (condition) {
+    case "constructive":
+      return "Constructive";
+    case "watchful":
+      return "Watchful";
+    case "stressed":
+      return "Stressed";
+    default:
+      return "Data Limited";
+  }
+}
+
+function buildHistoryChart(points: MarketDataSnapshot["points"]) {
+  if (points.length === 0) {
+    return null;
+  }
+
+  const width = 720;
+  const height = 260;
+  const padding = 20;
+  const closes = points.map((point) => point.close);
+  const minClose = Math.min(...closes);
+  const maxClose = Math.max(...closes);
+  const priceSpan = maxClose - minClose || 1;
+  const step = points.length === 1 ? 0 : (width - padding * 2) / (points.length - 1);
+
+  const coordinates = points.map((point, index) => {
+    const x = padding + index * step;
+    const y = height - padding - ((point.close - minClose) / priceSpan) * (height - padding * 2);
+    return { x, y };
+  });
+
+  const linePath = coordinates
+    .map((coordinate, index) => `${index === 0 ? "M" : "L"} ${coordinate.x.toFixed(2)} ${coordinate.y.toFixed(2)}`)
+    .join(" ");
+  const areaPath = `${linePath} L ${coordinates[coordinates.length - 1]?.x.toFixed(2) ?? padding} ${height - padding} L ${coordinates[0]?.x.toFixed(2) ?? padding} ${height - padding} Z`;
+
+  return {
+    width,
+    height,
+    padding,
+    linePath,
+    areaPath,
+    minClose,
+    maxClose,
+    startPrice: closes[0],
+    endPrice: closes[closes.length - 1],
+    startDate: points[0]?.date ?? null,
+    endDate: points[points.length - 1]?.date ?? null,
+  };
+}
 
 function MetricCard({
   label,
@@ -95,12 +200,31 @@ function MetricCard({
 export function PortfolioDashboard({ user }: { user: UserData }) {
   const [portfolio, setPortfolio] = useState<PortfolioState>(emptyPortfolio);
   const [portfolioForm, setPortfolioForm] = useState<PortfolioFormState>(initialPortfolioForm);
+  const [sectorForm, setSectorForm] = useState<SectorFormState>(initialSectorForm);
   const [portfolioMessage, setPortfolioMessage] = useState("");
   const [portfolioError, setPortfolioError] = useState("");
+  const [historySnapshot, setHistorySnapshot] = useState<MarketDataSnapshot | null>(null);
+  const [historyError, setHistoryError] = useState("");
+  const [selectedHolding, setSelectedHolding] = useState<PortfolioHolding | null>(null);
   const [isPortfolioPending, startPortfolioTransition] = useTransition();
+  const [isHistoryPending, startHistoryTransition] = useTransition();
 
-  const portfolioDisplayCurrency = portfolio.summary.displayCurrency || "USD";
+  const portfolioDisplayCurrency = portfolio.summary.displayCurrency || portfolio.account.currency || "USD";
   const normalizedPortfolioSymbol = portfolioForm.symbol.trim().toUpperCase() || DEFAULT_SYMBOL;
+  const selectedSectorModel =
+    PORTFOLIO_SECTOR_MODELS.find((sector) => sector.id === sectorForm.sector) ?? PORTFOLIO_SECTOR_MODELS[0];
+  const tradeQuantity = Number(portfolioForm.quantity);
+  const tradePrice = Number(portfolioForm.purchasePrice);
+  const estimatedTradeCost =
+    Number.isFinite(tradeQuantity) && Number.isFinite(tradePrice) && tradeQuantity > 0 && tradePrice > 0
+      ? tradeQuantity * tradePrice
+      : 0;
+  const sectorBudget = Number(sectorForm.budget);
+  const historySymbol = selectedHolding?.symbol ?? null;
+  const historyChart = useMemo(
+    () => (historySnapshot ? buildHistoryChart(historySnapshot.points) : null),
+    [historySnapshot],
+  );
 
   useEffect(() => {
     startPortfolioTransition(() => {
@@ -109,7 +233,7 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
   }, []);
 
   function formatPortfolioCurrency(value: number) {
-    return portfolio.summary.isCurrencyMixed ? formatPlainNumber(value) : formatCurrency(value, portfolioDisplayCurrency);
+    return formatCurrency(value, portfolioDisplayCurrency);
   }
 
   async function loadPortfolio() {
@@ -205,7 +329,7 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
           });
           const payload = (await response.json()) as PortfolioPayload;
           if (!response.ok || !payload.portfolio) {
-            throw new Error(payload.error ?? "Unable to add portfolio holding.");
+            throw new Error(payload.error ?? "Unable to buy the stock.");
           }
 
           setPortfolio(payload.portfolio);
@@ -213,17 +337,103 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
             ...current,
             symbol: normalizedPortfolioSymbol,
           }));
+          const spentCash = payload.spentCash ?? quantity * purchasePrice;
           setPortfolioMessage(
             payload.refreshError
-              ? `Saved ${normalizedPortfolioSymbol} to your portfolio. ${payload.refreshError}`
-              : `Saved ${normalizedPortfolioSymbol} to your portfolio and refreshed its market snapshot.`,
+              ? `Bought ${normalizedPortfolioSymbol} for ${formatCurrency(spentCash, portfolio.account.currency)}. ${payload.refreshError}`
+              : `Bought ${normalizedPortfolioSymbol} for ${formatCurrency(spentCash, portfolio.account.currency)} and refreshed its market snapshot.`,
           );
         } catch (error) {
-          const message = error instanceof Error ? error.message : "Unable to add portfolio holding.";
+          const message = error instanceof Error ? error.message : "Unable to buy the stock.";
           setPortfolioError(message);
         }
       })();
     });
+  }
+
+  async function buildSectorPortfolio() {
+    setPortfolioMessage("");
+    setPortfolioError("");
+
+    if (!Number.isFinite(sectorBudget) || sectorBudget <= 0) {
+      setPortfolioError("Sector budget must be greater than zero.");
+      return;
+    }
+
+    if (sectorBudget > portfolio.account.cashBalance) {
+      setPortfolioError("Sector budget is larger than your available virtual cash.");
+      return;
+    }
+
+    startPortfolioTransition(() => {
+      void (async () => {
+        try {
+          const response = await fetch("/api/portfolio/sector", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              sector: sectorForm.sector,
+              budget: sectorBudget,
+            }),
+          });
+          const payload = (await response.json()) as PortfolioPayload;
+          if (!response.ok || !payload.portfolio) {
+            throw new Error(payload.error ?? "Unable to build the sector portfolio.");
+          }
+
+          setPortfolio(payload.portfolio);
+          const spentCash = payload.spentCash ?? sectorBudget;
+          const purchasedSymbols = payload.purchasedSymbols ?? [];
+          const failedSymbols = payload.failedSymbols ?? [];
+
+          setPortfolioMessage(
+            `${payload.sectorLabel ?? selectedSectorModel.label} deployed ${formatCurrency(
+              spentCash,
+              portfolio.account.currency,
+            )}${purchasedSymbols.length > 0 ? ` across ${purchasedSymbols.join(", ")}` : ""}${
+              failedSymbols.length > 0 ? `. Skipped ${failedSymbols.join(", ")}.` : "."
+            }`,
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unable to build the sector portfolio.";
+          setPortfolioError(message);
+        }
+      })();
+    });
+  }
+
+  async function openHoldingHistory(holding: PortfolioHolding) {
+    setSelectedHolding(holding);
+    setHistorySnapshot(null);
+    setHistoryError("");
+
+    startHistoryTransition(() => {
+      void (async () => {
+        try {
+          const response = await fetch(
+            `/api/market-data/history?symbol=${encodeURIComponent(holding.symbol)}&range=5y&interval=1d`,
+            { cache: "no-store" },
+          );
+          const payload = (await response.json()) as HistoryPayload;
+          if (!response.ok || !payload.snapshot) {
+            throw new Error(payload.error ?? "Unable to load the five-year history.");
+          }
+
+          setHistorySnapshot(payload.snapshot);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unable to load the five-year history.";
+          setHistoryError(message);
+        }
+      })();
+    });
+  }
+
+  function closeHoldingHistory() {
+    setSelectedHolding(null);
+    setHistorySnapshot(null);
+    setHistoryError("");
   }
 
   return (
@@ -231,33 +441,26 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
       <section className="hero hero-terminal">
         <div>
           <p className="kicker">Portfolio Monitor</p>
-          <h1>Track holdings separately from the pricing terminal.</h1>
+          <h1>Deploy capital, build sector baskets, and monitor downside risk.</h1>
           <p className="hero-copy">
-            Add positions, persist them to MongoDB under your user, and reprice the portfolio with Massive for U.S.
-            symbols and Yahoo Finance for international ones.
+            Every signed-in account starts with $100,000 in virtual cash. Buy individual names, auto-build a sector
+            basket, click any position for a five-year chart, and monitor daily portfolio VaR from stored market
+            history.
           </p>
         </div>
 
         <div className="hero-panel">
           <div>
-            <span className="panel-label">Holdings</span>
-            <strong>{portfolio.summary.holdingsCount}</strong>
+            <span className="panel-label">Buying Power</span>
+            <strong>{formatCurrency(portfolio.account.cashBalance, portfolio.account.currency)}</strong>
           </div>
           <div>
-            <span className="panel-label">Symbols</span>
-            <strong>{portfolio.summary.symbolsCount}</strong>
+            <span className="panel-label">Total Equity</span>
+            <strong>{formatPortfolioCurrency(portfolio.summary.totalEquity)}</strong>
           </div>
           <div>
-            <span className="panel-label">Unrealized P/L</span>
-            <strong className={portfolio.summary.unrealizedGainLoss >= 0 ? "performance-green" : "performance-red"}>
-              {portfolio.summary.isCurrencyMixed
-                ? `${portfolio.summary.unrealizedGainLoss >= 0 ? "+" : ""}${formatPlainNumber(
-                    portfolio.summary.unrealizedGainLoss,
-                  )}`
-                : `${portfolio.summary.unrealizedGainLoss >= 0 ? "+" : ""}${formatPortfolioCurrency(
-                    portfolio.summary.unrealizedGainLoss,
-                  )}`}
-            </strong>
+            <span className="panel-label">VaR Regime</span>
+            <strong>{formatMarketCondition(portfolio.risk.marketCondition)}</strong>
           </div>
           <div>
             <span className="panel-label">User</span>
@@ -270,7 +473,7 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
         <aside className="control-panel">
           <div className="panel-heading">
             <p className="kicker">Trade Ticket</p>
-            <h2>Add holding</h2>
+            <h2>Buy stock</h2>
           </div>
 
           <label>
@@ -320,9 +523,14 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
             />
           </label>
 
+          <div className="trade-preview">
+            <span>Estimated Spend</span>
+            <strong>{formatCurrency(estimatedTradeCost, portfolio.account.currency)}</strong>
+          </div>
+
           <div className="action-row">
             <button type="button" onClick={addPortfolioHolding} disabled={isPortfolioPending}>
-              {isPortfolioPending ? "Saving..." : "Add Holding"}
+              {isPortfolioPending ? "Buying..." : "Buy Stock"}
             </button>
             <button
               type="button"
@@ -334,10 +542,58 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
             </button>
           </div>
 
+          <div className="sidebar-divider" />
+
+          <div className="panel-heading panel-heading-compact">
+            <p className="kicker">Sector Allocator</p>
+            <h2>Build for me</h2>
+          </div>
+
+          <label>
+            Sector Basket
+            <select
+              value={sectorForm.sector}
+              onChange={(event) =>
+                setSectorForm((current) => ({
+                  ...current,
+                  sector: event.target.value as PortfolioSectorId,
+                }))
+              }
+            >
+              {PORTFOLIO_SECTOR_MODELS.map((sector) => (
+                <option key={sector.id} value={sector.id}>
+                  {sector.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Sector Budget
+            <input
+              type="number"
+              min="1"
+              step="100"
+              value={sectorForm.budget}
+              onChange={(event) =>
+                setSectorForm((current) => ({
+                  ...current,
+                  budget: event.target.value,
+                }))
+              }
+            />
+          </label>
+
+          <p className="helper-text">{selectedSectorModel.thesis}</p>
+
+          <button type="button" onClick={buildSectorPortfolio} disabled={isPortfolioPending}>
+            {isPortfolioPending ? "Allocating..." : "Buy Sector Basket"}
+          </button>
+
           <p className="helper-text">
-            U.S. holdings use Massive after refresh, with delayed or closing data when your plan does not include live
-            snapshots. Holdings are stored in MongoDB against your user ID so each signed-in account sees its own
-            portfolio.
+            Each account starts with {formatCurrency(portfolio.account.startingCash, portfolio.account.currency)} in
+            virtual cash. All buys debit that balance in {portfolio.account.currency}, using the position currency and
+            FX rate in effect when the order is created.
           </p>
           {portfolio.summary.pendingHoldingsCount > 0 ? (
             <p className="helper-text">
@@ -347,7 +603,7 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
           ) : null}
           {portfolio.summary.isCurrencyMixed ? (
             <p className="helper-text">
-              Totals are not FX-converted because your holdings span multiple currencies.
+              Cross-currency totals and VaR are converted into {portfolio.account.currency} using the portfolio FX engine.
             </p>
           ) : null}
           {portfolioMessage ? <p className="feedback">{portfolioMessage}</p> : null}
@@ -357,30 +613,40 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
         <div className="content-stack">
           <section className="metrics-grid portfolio-metrics-grid">
             <MetricCard
-              label="Total Cost Basis"
-              value={formatPortfolioCurrency(portfolio.summary.totalCostBasis)}
-              note={`${portfolio.summary.holdingsCount} holding${portfolio.summary.holdingsCount === 1 ? "" : "s"}`}
+              label="Available Cash"
+              value={formatCurrency(portfolio.account.cashBalance, portfolio.account.currency)}
+              note={`${formatSignedPercent(portfolio.summary.cashUtilizationPercent)} deployed`}
               accent="gold"
             />
             <MetricCard
-              label="Current Value"
+              label="Holdings Value"
               value={formatPortfolioCurrency(portfolio.summary.totalCurrentValue)}
               note={`${portfolio.summary.pricedHoldingsCount} priced holding${portfolio.summary.pricedHoldingsCount === 1 ? "" : "s"}`}
               accent="cyan"
             />
             <MetricCard
+              label="Total Equity"
+              value={formatPortfolioCurrency(portfolio.summary.totalEquity)}
+              note={`${portfolio.summary.holdingsCount} total position${portfolio.summary.holdingsCount === 1 ? "" : "s"}`}
+              accent="green"
+            />
+            <MetricCard
+              label="Cost Basis"
+              value={formatPortfolioCurrency(portfolio.summary.totalCostBasis)}
+              note={`${portfolio.summary.symbolsCount} symbol${portfolio.summary.symbolsCount === 1 ? "" : "s"}`}
+              accent="gold"
+            />
+            <MetricCard
               label="Unrealized P/L"
-              value={
-                portfolio.summary.isCurrencyMixed
-                  ? `${portfolio.summary.unrealizedGainLoss >= 0 ? "+" : ""}${formatPlainNumber(
-                      portfolio.summary.unrealizedGainLoss,
-                    )}`
-                  : `${portfolio.summary.unrealizedGainLoss >= 0 ? "+" : ""}${formatPortfolioCurrency(
-                      portfolio.summary.unrealizedGainLoss,
-                    )}`
-              }
+              value={formatSignedCurrency(portfolio.summary.unrealizedGainLoss, portfolioDisplayCurrency)}
               note={formatSignedPercent(portfolio.summary.unrealizedGainLossPercent)}
               accent={portfolio.summary.unrealizedGainLoss >= 0 ? "green" : "red"}
+            />
+            <MetricCard
+              label="1D VaR 95%"
+              value={formatCurrency(portfolio.risk.valueAtRisk95, portfolio.account.currency)}
+              note={formatMarketCondition(portfolio.risk.marketCondition)}
+              accent={portfolio.risk.marketCondition === "stressed" ? "red" : "cyan"}
             />
           </section>
 
@@ -393,11 +659,16 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
             <div className="portfolio-list">
               {portfolio.holdings.length === 0 ? (
                 <p className="empty-state">
-                  No holdings yet. Add a symbol on the left to start storing positions for this user.
+                  No holdings yet. Buy a stock or deploy a sector basket from the left panel to start the portfolio.
                 </p>
               ) : (
                 portfolio.holdings.map((holding) => (
-                  <article key={holding._id} className={`portfolio-card tone-${holding.performanceTone}`}>
+                  <button
+                    key={holding._id}
+                    type="button"
+                    className={`portfolio-card portfolio-card-button tone-${holding.performanceTone}`}
+                    onClick={() => openHoldingHistory(holding)}
+                  >
                     <div className="portfolio-card-header">
                       <div>
                         <strong>{holding.symbol}</strong>
@@ -459,17 +730,209 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
                           ? "Pending"
                           : formatSignedPercent(holding.unrealizedGainLossPercent)}
                       </span>
-                      <span>
-                        {holding.fetchedAt ? `Snapshot refreshed ${formatDate(holding.fetchedAt)}` : "No saved quote yet"}
-                      </span>
+                      <span>{holding.fetchedAt ? `Snapshot refreshed ${formatDate(holding.fetchedAt)}` : "No saved quote yet"}</span>
+                      <span>Click for position + five-year trend</span>
                     </div>
-                  </article>
+                  </button>
                 ))
               )}
             </div>
           </section>
+
+          <section className="panel">
+            <div className="panel-heading">
+              <p className="kicker">Risk Engine</p>
+              <h2>Portfolio value at risk</h2>
+            </div>
+
+            <div className="risk-grid">
+              <MetricCard
+                label="One-Day VaR 95%"
+                value={formatCurrency(portfolio.risk.valueAtRisk95, portfolio.account.currency)}
+                note={`${portfolio.risk.lookbackDays} aligned returns`}
+                accent="red"
+              />
+              <MetricCard
+                label="One-Day VaR 99%"
+                value={formatCurrency(portfolio.risk.valueAtRisk99, portfolio.account.currency)}
+                note="Tail loss threshold"
+                accent="red"
+              />
+              <MetricCard
+                label="Expected Shortfall"
+                value={formatCurrency(portfolio.risk.expectedShortfall95, portfolio.account.currency)}
+                note="Average beyond VaR"
+                accent="gold"
+              />
+              <MetricCard
+                label="Annualized Vol"
+                value={formatRatioPercent(portfolio.risk.annualizedVolatility)}
+                note={formatMarketCondition(portfolio.risk.marketCondition)}
+                accent={portfolio.risk.marketCondition === "stressed" ? "red" : "cyan"}
+              />
+            </div>
+
+            <div className="split-panel risk-panel">
+              <article className="risk-block">
+                <p className="eyebrow">Market Condition</p>
+                <h3>{formatMarketCondition(portfolio.risk.marketCondition)}</h3>
+                <p className="helper-text">{portfolio.risk.methodology}</p>
+
+                <div className="status-strip">
+                  <span className="status-badge">{`Concentration ${formatRatioPercent(portfolio.risk.concentration)}`}</span>
+                  <span className="status-badge">{`Blend Vol ${formatRatioPercent(portfolio.risk.weightedRealizedVolatility)}`}</span>
+                  <span className="status-badge">{`Return Drift ${formatSignedPercent(
+                    portfolio.risk.weightedAnnualizedReturn * 100,
+                  )}`}</span>
+                  {portfolio.risk.fxPairsUsed.length > 0 ? (
+                    <span className="status-badge">{`FX ${portfolio.risk.fxPairsUsed.join(", ")}`}</span>
+                  ) : null}
+                  {portfolio.risk.topHoldingSymbol ? (
+                    <span className="status-badge">{`${portfolio.risk.topHoldingSymbol} ${formatRatioPercent(
+                      portfolio.risk.topHoldingWeight,
+                    )}`}</span>
+                  ) : null}
+                </div>
+              </article>
+
+              <article className="risk-block">
+                <p className="eyebrow">Risk Drivers</p>
+                <ul className="risk-list">
+                  {portfolio.risk.drivers.map((driver) => (
+                    <li key={driver}>{driver}</li>
+                  ))}
+                </ul>
+                {portfolio.risk.worstDailyReturn !== null && portfolio.risk.bestDailyReturn !== null ? (
+                  <p className="helper-text">
+                    Historical daily range: {formatSignedPercent(portfolio.risk.worstDailyReturn * 100)} to{" "}
+                    {formatSignedPercent(portfolio.risk.bestDailyReturn * 100)}.
+                  </p>
+                ) : null}
+              </article>
+            </div>
+          </section>
         </div>
       </section>
+
+      {historySymbol ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="holding-history-title" onClick={closeHoldingHistory}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <p className="kicker">Holding History</p>
+                <h2 id="holding-history-title">{historySnapshot?.symbol ?? historySymbol}</h2>
+              </div>
+              <button type="button" className="ghost-button modal-close" onClick={closeHoldingHistory}>
+                Close
+              </button>
+            </div>
+
+            {isHistoryPending ? <p className="feedback">Loading five-year history for {historySymbol}...</p> : null}
+            {historyError ? <p className="feedback error">{historyError}</p> : null}
+
+            {selectedHolding ? (
+              <div className="risk-grid">
+                <MetricCard
+                  label="Held Quantity"
+                  value={formatPlainNumber(selectedHolding.quantity)}
+                  note={selectedHolding.symbol}
+                  accent="cyan"
+                />
+                <MetricCard
+                  label="Cost Basis"
+                  value={formatCurrency(selectedHolding.costBasisBase, selectedHolding.accountCurrency)}
+                  note={`${formatCurrency(selectedHolding.costBasis, selectedHolding.currency)} local`}
+                  accent="gold"
+                />
+                <MetricCard
+                  label="Current Value"
+                  value={
+                    selectedHolding.currentValueBase === null
+                      ? "Pending"
+                      : formatCurrency(selectedHolding.currentValueBase, selectedHolding.accountCurrency)
+                  }
+                  note={
+                    selectedHolding.currentValue === null
+                      ? "Awaiting quote"
+                      : `${formatCurrency(selectedHolding.currentValue, selectedHolding.currency)} local`
+                  }
+                  accent="cyan"
+                />
+                <MetricCard
+                  label="Equity Impact"
+                  value={
+                    selectedHolding.unrealizedGainLossBase === null
+                      ? "Pending"
+                      : formatSignedCurrency(selectedHolding.unrealizedGainLossBase, selectedHolding.accountCurrency)
+                  }
+                  note={`FX ${formatPlainNumber(selectedHolding.fxRateToBase)} ${selectedHolding.accountCurrency}/${selectedHolding.currency}`}
+                  accent={selectedHolding.unrealizedGainLossBase !== null && selectedHolding.unrealizedGainLossBase < 0 ? "red" : "green"}
+                />
+              </div>
+            ) : null}
+
+            {historySnapshot && historyChart ? (
+              <div className="content-stack">
+                <div>
+                  <p className="helper-text">
+                    {historySnapshot.shortName} · {historySnapshot.exchangeName} · {historySnapshot.points.length} daily
+                    observations
+                  </p>
+
+                  <div className="chart-shell">
+                    <svg
+                      viewBox={`0 0 ${historyChart.width} ${historyChart.height}`}
+                      className="history-chart"
+                      preserveAspectRatio="none"
+                    >
+                      <defs>
+                        <linearGradient id="history-fill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="rgba(34, 196, 255, 0.35)" />
+                          <stop offset="100%" stopColor="rgba(34, 196, 255, 0.02)" />
+                        </linearGradient>
+                      </defs>
+                      <path d={historyChart.areaPath} fill="url(#history-fill)" />
+                      <path d={historyChart.linePath} fill="none" stroke="var(--accent-cyan)" strokeWidth="3" />
+                    </svg>
+                  </div>
+
+                  <div className="chart-caption">
+                    <span>{historyChart.startDate ? formatDate(historyChart.startDate) : "Start"}</span>
+                    <span>{historyChart.endDate ? formatDate(historyChart.endDate) : "End"}</span>
+                  </div>
+                </div>
+
+                <div className="risk-grid">
+                  <MetricCard
+                    label="Five-Year Return"
+                    value={formatSignedPercent(((historyChart.endPrice - historyChart.startPrice) / historyChart.startPrice) * 100)}
+                    note={historySnapshot.currency}
+                    accent={historyChart.endPrice >= historyChart.startPrice ? "green" : "red"}
+                  />
+                  <MetricCard
+                    label="Range High"
+                    value={formatCurrency(historyChart.maxClose, historySnapshot.currency)}
+                    note="Closing basis"
+                    accent="cyan"
+                  />
+                  <MetricCard
+                    label="Range Low"
+                    value={formatCurrency(historyChart.minClose, historySnapshot.currency)}
+                    note="Closing basis"
+                    accent="gold"
+                  />
+                  <MetricCard
+                    label="Realized Vol"
+                    value={formatRatioPercent(historySnapshot.realizedVolatility)}
+                    note={selectedHolding ? `This position feeds your ${portfolio.account.currency} VaR.` : "Annualized"}
+                    accent="red"
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -295,6 +295,10 @@ button:hover {
   margin-bottom: 18px;
 }
 
+.panel-heading-compact {
+  margin-top: 18px;
+}
+
 .panel-heading h2 {
   margin: 8px 0 0;
   font-size: 1.2rem;
@@ -345,6 +349,24 @@ button:hover {
 
 .action-row button {
   flex: 1;
+}
+
+.trade-preview {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 145, 0, 0.18);
+  background: rgba(255, 145, 0, 0.05);
+  color: var(--text-muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.trade-preview strong {
+  color: var(--text-main);
 }
 
 button {
@@ -511,6 +533,17 @@ button:disabled {
   padding: 18px;
 }
 
+.portfolio-card-button {
+  width: 100%;
+  text-align: left;
+  background: #0b0b0b;
+  text-transform: none;
+}
+
+.portfolio-card-button:hover {
+  background: #101010;
+}
+
 .portfolio-card.tone-green {
   border-color: rgba(103, 255, 141, 0.32);
 }
@@ -574,6 +607,105 @@ button:disabled {
   font-size: 0.92rem;
 }
 
+.risk-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.risk-panel {
+  margin-top: 18px;
+}
+
+.risk-block {
+  padding: 18px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.risk-block h3 {
+  margin: 8px 0 10px;
+  font-family: "IBM Plex Mono", monospace;
+  text-transform: uppercase;
+}
+
+.risk-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+}
+
+.risk-list li + li {
+  margin-top: 10px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.modal-card {
+  width: min(1040px, 100%);
+  max-height: min(92vh, 960px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: #080808;
+  box-shadow: 0 24px 52px rgba(0, 0, 0, 0.6);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.modal-header h2 {
+  margin: 8px 0 0;
+  font-family: "IBM Plex Mono", monospace;
+  text-transform: uppercase;
+}
+
+.modal-close {
+  flex: 0 0 auto;
+}
+
+.chart-shell {
+  height: 280px;
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid rgba(34, 196, 255, 0.2);
+  background:
+    linear-gradient(rgba(34, 196, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 196, 255, 0.05) 1px, transparent 1px),
+    #050505;
+  background-size: 36px 36px, 36px 36px, auto;
+}
+
+.history-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.chart-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -634,7 +766,8 @@ button:disabled {
 
   .metrics-grid,
   .greek-grid,
-  .portfolio-card-grid {
+  .portfolio-card-grid,
+  .risk-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -658,6 +791,7 @@ button:disabled {
   .metrics-grid.compact,
   .greek-grid,
   .portfolio-card-grid,
+  .risk-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -678,7 +812,10 @@ button:disabled {
   .auth-cluster,
   .profile-summary,
   .portfolio-card-header,
-  .portfolio-card-footer {
+  .portfolio-card-footer,
+  .modal-header,
+  .chart-caption,
+  .trade-preview {
     flex-direction: column;
     align-items: stretch;
   }
@@ -690,5 +827,17 @@ button:disabled {
   .site-nav a,
   .site-brand {
     text-align: center;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+  }
+
+  .modal-card {
+    padding: 16px;
+  }
+
+  .chart-shell {
+    height: 220px;
   }
 }

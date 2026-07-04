@@ -33,6 +33,8 @@ NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=replace_with_a_long_random_secret
 AUTH_GOOGLE_ID=replace_with_google_oauth_client_id
 AUTH_GOOGLE_SECRET=replace_with_google_oauth_client_secret
+MASSIVE_API_KEY=replace_with_massive_api_key
+MASSIVE_API_BASE_URL=https://api.massive.com
 ```
 
 ## Google OAuth setup
@@ -71,6 +73,50 @@ Open:
 
 ```text
 http://localhost:3000
+```
+
+## Deploy on Vercel
+
+This app is configured for Vercel as a Next.js project. The repository includes `vercel.json` so Vercel uses:
+
+- Framework preset: `nextjs`
+- Install command: `npm ci`
+- Build command: `npm run build`
+- Node runtime: `22.x`
+
+In the Vercel dashboard, add these environment variables for Production and any Preview environments you plan to use:
+
+```env
+MONGODB_URI=mongodb+srv://...
+MONGODB_DB_NAME=black_scholes_app
+AUTH_SECRET=generate_a_long_random_secret
+NEXTAUTH_SECRET=use_the_same_value_as_AUTH_SECRET
+NEXTAUTH_URL=https://your-production-domain.example
+AUTH_GOOGLE_ID=your_google_oauth_client_id
+AUTH_GOOGLE_SECRET=your_google_oauth_client_secret
+MASSIVE_API_KEY=your_massive_api_key
+MASSIVE_API_BASE_URL=https://api.massive.com
+```
+
+Use a hosted MongoDB connection string such as MongoDB Atlas. A local `localhost` MongoDB URI will not be reachable from Vercel.
+
+For Google OAuth, add this authorized redirect URI in Google Cloud Console:
+
+```text
+https://your-production-domain.example/api/auth/callback/google
+```
+
+If you want Google sign-in to work on Vercel Preview deployments, add each preview callback URL as an authorized redirect URI as well.
+
+Deploy from the CLI:
+
+```bash
+npm i -g vercel
+vercel login
+vercel link
+vercel env pull .env.local
+vercel deploy
+vercel deploy --prod
 ```
 
 ## How to use the app
