@@ -4,6 +4,9 @@ import { CalculationModel } from "@/lib/db/models/calculation";
 import { connectToDatabase } from "@/lib/db/mongodb";
 import { blackScholesGreeks, blackScholesPrice } from "@/lib/finance/black-scholes";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 type CreateCalculationBody = {
   spotPrice: number;
   strikePrice: number;

@@ -5,6 +5,9 @@ import { MarketDataSnapshotModel } from "@/lib/db/models/market-data-snapshot";
 import { pullLatestMarketDataSnapshot } from "@/lib/engines/market-data-engine";
 import type { StoredMarketDataSnapshot } from "@/lib/services/market-data";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 const DEFAULT_SYMBOL = "AAPL";
 
 function normalizeSymbol(value: unknown) {

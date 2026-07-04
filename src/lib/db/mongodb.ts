@@ -22,6 +22,8 @@ export async function connectToDatabase() {
     throw new Error("MONGODB_URI is not configured. Add it to .env.local before using MongoDB features.");
   }
 
+  const dbName = process.env.MONGODB_DB_NAME?.trim();
+
   if (cache.connection) {
     return cache.connection;
   }
@@ -29,6 +31,7 @@ export async function connectToDatabase() {
   if (!cache.promise) {
     cache.promise = mongoose.connect(connectionString, {
       bufferCommands: false,
+      ...(dbName ? { dbName } : {}),
     });
   }
 
