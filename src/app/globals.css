@@ -706,6 +706,151 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.backtest-layout {
+  grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
+}
+
+.backtest-control-panel {
+  max-height: calc(100vh - 106px);
+}
+
+.strategy-builder-stack,
+.strategy-result-grid,
+.suggestion-grid,
+.strategy-stat-grid,
+.strategy-control-grid,
+.custom-rule-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.strategy-builder-stack {
+  gap: 18px;
+}
+
+.strategy-builder-card {
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 145, 0, 0.24);
+}
+
+.strategy-builder-card:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.strategy-card-header,
+.equity-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.strategy-card-header {
+  margin-bottom: 14px;
+}
+
+.strategy-card-header strong {
+  display: block;
+  margin-top: 4px;
+  font-family: "IBM Plex Mono", monospace;
+  text-transform: uppercase;
+}
+
+.strategy-control-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.custom-rule-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.strategy-result-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.strategy-result-card h2 {
+  overflow-wrap: anywhere;
+}
+
+.strategy-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.strategy-note-list {
+  margin-top: 16px;
+}
+
+.equity-chart-shell {
+  border-color: rgba(103, 255, 141, 0.18);
+  background:
+    linear-gradient(rgba(103, 255, 141, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 196, 255, 0.05) 1px, transparent 1px),
+    #050505;
+  background-size: 36px 36px, 36px 36px, auto;
+}
+
+.equity-legend {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.equity-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.equity-legend i {
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.trade-table {
+  overflow: auto;
+  border: 1px solid var(--border-color);
+}
+
+.trade-table-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.7fr 1fr 1fr;
+  min-width: 720px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.trade-table-row:last-child {
+  border-bottom: 0;
+}
+
+.trade-table-row span {
+  padding: 12px;
+  color: var(--text-muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+}
+
+.trade-table-head span {
+  color: var(--accent-amber);
+  background: rgba(255, 145, 0, 0.06);
+  text-transform: uppercase;
+}
+
+.suggestion-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.suggestion-grid .risk-block p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -754,7 +899,8 @@ button:disabled {
 @media (max-width: 1180px) {
   .hero,
   .layout-grid,
-  .split-panel {
+  .split-panel,
+  .strategy-result-grid {
     grid-template-columns: 1fr;
   }
 
@@ -767,7 +913,8 @@ button:disabled {
   .metrics-grid,
   .greek-grid,
   .portfolio-card-grid,
-  .risk-grid {
+  .risk-grid,
+  .suggestion-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -792,7 +939,11 @@ button:disabled {
   .greek-grid,
   .portfolio-card-grid,
   .risk-grid,
-  .form-grid {
+  .form-grid,
+  .strategy-control-grid,
+  .custom-rule-grid,
+  .strategy-stat-grid,
+  .suggestion-grid {
     grid-template-columns: 1fr;
   }
 

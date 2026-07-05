@@ -17,9 +17,11 @@ const cache = global.mongooseCache ?? {
 global.mongooseCache = cache;
 
 export async function connectToDatabase() {
-  const connectionString = process.env.MONGODB_URI;
+  const connectionString = (process.env.MONGODB_URI || process.env.MONGO_MONGODB_URI || "").trim();
   if (!connectionString || connectionString.includes("your_mongodb_connection_string_here")) {
-    throw new Error("MONGODB_URI is not configured. Add it to .env.local before using MongoDB features.");
+    throw new Error(
+      "MongoDB URI is not configured. Set MONGODB_URI locally or MONGO_MONGODB_URI on Vercel before using MongoDB features.",
+    );
   }
 
   const dbName = process.env.MONGODB_DB_NAME?.trim();
