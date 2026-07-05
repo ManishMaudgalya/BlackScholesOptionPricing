@@ -9,6 +9,7 @@ The app provides:
 - Yahoo Finance historical data refreshes for market inputs
 - MongoDB-backed market snapshots per user and symbol
 - User-scoped saved Black-Scholes calculations
+- Yahoo Finance backtesting for two user-defined trading strategies
 - A profile page for account details
 
 ## Stack
@@ -36,6 +37,8 @@ AUTH_GOOGLE_SECRET=replace_with_google_oauth_client_secret
 MASSIVE_API_KEY=replace_with_massive_api_key
 MASSIVE_API_BASE_URL=https://api.massive.com
 ```
+
+For local development, use `MONGODB_URI`. The app also accepts `MONGO_MONGODB_URI` for Vercel deployments.
 
 ## Google OAuth setup
 
@@ -87,7 +90,7 @@ This app is configured for Vercel as a Next.js project. The repository includes 
 In the Vercel dashboard, add these environment variables for Production and any Preview environments you plan to use:
 
 ```env
-MONGODB_URI=mongodb+srv://...
+MONGO_MONGODB_URI=mongodb+srv://...
 MONGODB_DB_NAME=black_scholes_app
 AUTH_SECRET=generate_a_long_random_secret
 NEXTAUTH_SECRET=use_the_same_value_as_AUTH_SECRET
@@ -129,13 +132,19 @@ vercel deploy --prod
 5. Adjust strike, expiry, rate, or side as needed.
 6. Click `Save to MongoDB` to persist the calculation and its market-data context.
 
+For backtesting, open `/backtesting`, choose a Yahoo Finance symbol, edit the two strategy tickets, and run the
+comparison. The backtesting engine uses longer-range daily Yahoo Finance history, models commission and slippage, and
+reports equity curves, drawdown, Sharpe ratio, win rate, trade logs, and buy-and-hold comparison.
+
 ## Main routes
 
 - `/` - pricing dashboard
+- `/backtesting` - two-strategy Yahoo Finance backtesting dashboard
 - `/profile` - signed-in account summary
 - `/api/auth/*` - Auth.js handlers
 - `/api/calculations` - user-scoped saved calculations
 - `/api/market-data` - Yahoo Finance refresh and stored market snapshots
+- `/api/backtests` - authenticated Yahoo Finance backtesting endpoint
 
 ## Available scripts
 
