@@ -414,7 +414,7 @@ export function PricingDashboard({ user }: { user: UserData }) {
       <section className="hero hero-terminal">
         <div>
           <p className="kicker">Pricing Monitor</p>
-          <h1>Black-Scholes analytics with Massive-backed U.S. stock pricing.</h1>
+          <h1>Price options, review Greeks, and save scenarios.</h1>
           <p className="hero-copy">
             Use Massive for U.S. equity pricing and Yahoo Finance for other markets, persist refreshed
             snapshots to MongoDB, and save option scenarios tied to your signed-in account.
@@ -654,7 +654,7 @@ export function PricingDashboard({ user }: { user: UserData }) {
                       key={cell.id}
                       className="heatmap-cell"
                       style={{
-                        background: `rgba(255, 145, 0, ${0.14 + cell.normalized * 0.42})`,
+                        background: `rgba(37, 99, 235, ${0.08 + cell.normalized * 0.3})`,
                       }}
                       title={`${form.optionType.toUpperCase()} price: ${cell.value.toFixed(4)}`}
                     >

@@ -124,6 +124,8 @@ const formatDate = (value: string) =>
     timeStyle: "short",
   }).format(new Date(value));
 
+const clampChartLabelY = (value: number, height: number) => Math.min(Math.max(value, 18), height - 12);
+
 function formatMarketCondition(condition: PortfolioRisk["marketCondition"]) {
   switch (condition) {
     case "constructive":
@@ -161,6 +163,8 @@ function buildHistoryChart(points: MarketDataSnapshot["points"]) {
     .map((coordinate, index) => `${index === 0 ? "M" : "L"} ${coordinate.x.toFixed(2)} ${coordinate.y.toFixed(2)}`)
     .join(" ");
   const areaPath = `${linePath} L ${coordinates[coordinates.length - 1]?.x.toFixed(2) ?? padding} ${height - padding} L ${coordinates[0]?.x.toFixed(2) ?? padding} ${height - padding} Z`;
+  const startCoordinate = coordinates[0] ?? { x: padding, y: height - padding };
+  const endCoordinate = coordinates[coordinates.length - 1] ?? startCoordinate;
 
   return {
     width,
@@ -172,6 +176,20 @@ function buildHistoryChart(points: MarketDataSnapshot["points"]) {
     maxClose,
     startPrice: closes[0],
     endPrice: closes[closes.length - 1],
+    startLabel: {
+      pointX: startCoordinate.x,
+      pointY: startCoordinate.y,
+      x: startCoordinate.x + 8,
+      y: clampChartLabelY(startCoordinate.y - 10, height),
+      value: closes[0],
+    },
+    endLabel: {
+      pointX: endCoordinate.x,
+      pointY: endCoordinate.y,
+      x: endCoordinate.x - 8,
+      y: clampChartLabelY(endCoordinate.y - 10, height),
+      value: closes[closes.length - 1],
+    },
     startDate: points[0]?.date ?? null,
     endDate: points[points.length - 1]?.date ?? null,
   };
@@ -441,7 +459,7 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
       <section className="hero hero-terminal">
         <div>
           <p className="kicker">Portfolio Monitor</p>
-          <h1>Deploy capital, build sector baskets, and monitor downside risk.</h1>
+          <h1>Track holdings, cash, and portfolio risk.</h1>
           <p className="hero-copy">
             Every signed-in account starts with $100,000 in virtual cash. Buy individual names, auto-build a sector
             basket, click any position for a five-year chart, and monitor daily portfolio VaR from stored market
@@ -883,16 +901,63 @@ export function PortfolioDashboard({ user }: { user: UserData }) {
                     <svg
                       viewBox={`0 0 ${historyChart.width} ${historyChart.height}`}
                       className="history-chart"
-                      preserveAspectRatio="none"
+                      preserveAspectRatio="xMidYMid meet"
                     >
                       <defs>
                         <linearGradient id="history-fill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="rgba(34, 196, 255, 0.35)" />
-                          <stop offset="100%" stopColor="rgba(34, 196, 255, 0.02)" />
+                          <stop offset="0%" stopColor="rgba(37, 99, 235, 0.22)" />
+                          <stop offset="100%" stopColor="rgba(37, 99, 235, 0.02)" />
                         </linearGradient>
                       </defs>
+                      <line
+                        className="chart-grid-line"
+                        x1={historyChart.padding}
+                        x2={historyChart.width - historyChart.padding}
+                        y1={historyChart.padding}
+                        y2={historyChart.padding}
+                      />
+                      <line
+                        className="chart-grid-line"
+                        x1={historyChart.padding}
+                        x2={historyChart.width - historyChart.padding}
+                        y1={historyChart.height - historyChart.padding}
+                        y2={historyChart.height - historyChart.padding}
+                      />
+                      <text x={historyChart.padding} y={historyChart.padding - 6} className="chart-axis-label">
+                        High {formatCurrency(historyChart.maxClose, historySnapshot.currency)}
+                      </text>
+                      <text
+                        x={historyChart.padding}
+                        y={historyChart.height - historyChart.padding - 6}
+                        className="chart-axis-label"
+                      >
+                        Low {formatCurrency(historyChart.minClose, historySnapshot.currency)}
+                      </text>
                       <path d={historyChart.areaPath} fill="url(#history-fill)" />
                       <path d={historyChart.linePath} fill="none" stroke="var(--accent-cyan)" strokeWidth="3" />
+                      <circle
+                        cx={historyChart.startLabel.pointX}
+                        cy={historyChart.startLabel.pointY}
+                        r="4"
+                        className="chart-point"
+                      />
+                      <circle
+                        cx={historyChart.endLabel.pointX}
+                        cy={historyChart.endLabel.pointY}
+                        r="4"
+                        className="chart-point"
+                      />
+                      <text x={historyChart.startLabel.x} y={historyChart.startLabel.y} className="chart-value-label">
+                        {formatCurrency(historyChart.startLabel.value, historySnapshot.currency)}
+                      </text>
+                      <text
+                        x={historyChart.endLabel.x}
+                        y={historyChart.endLabel.y}
+                        className="chart-value-label"
+                        textAnchor="end"
+                      >
+                        {formatCurrency(historyChart.endLabel.value, historySnapshot.currency)}
+                      </text>
                     </svg>
                   </div>
 

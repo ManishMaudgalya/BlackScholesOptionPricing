@@ -7,9 +7,9 @@ import "./globals.css";
 export const runtime = "nodejs";
 
 export const metadata: Metadata = {
-  title: "Black-Scholes Terminal",
+  title: "Black-Scholes",
   description:
-    "A Bloomberg-style Black-Scholes terminal with Massive U.S. stock data, Yahoo Finance international coverage, and MongoDB-backed persistence.",
+    "A clean Black-Scholes app for option pricing, portfolios, backtests, and saved market data.",
 };
 
 export default async function RootLayout({

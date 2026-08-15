@@ -11,7 +11,7 @@ export function ProfilePanel({ user }: { user: UserData }) {
       <section className="hero">
         <div>
           <p className="kicker">Account</p>
-          <h1>Google-backed access for saved calculations, portfolio holdings, and market snapshots.</h1>
+          <h1>Your saved calculations, holdings, and market snapshots.</h1>
           <p className="hero-copy">
             Sign in with Google, refresh Massive data for U.S. stocks or Yahoo Finance data for international symbols,
             and keep both market snapshots and Black-Scholes calculations in MongoDB.

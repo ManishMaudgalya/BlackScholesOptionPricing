@@ -7,11 +7,10 @@ export function SignInHero() {
     <main className="page-shell">
       <section className="hero centered-hero">
         <div>
-          <p className="kicker">Black-Scholes Terminal</p>
-          <h1>Sign in with Google to save option scenarios and sync live market data.</h1>
+          <p className="kicker">Black-Scholes</p>
+          <h1>Sign in to save pricing scenarios and portfolio work.</h1>
           <p className="hero-copy">
-            Google authentication scopes the terminal to your account. MongoDB stores saved calculations,
-            portfolio holdings, and market snapshots per user.
+            Your account keeps saved calculations, portfolio holdings, and market snapshots in one place.
           </p>
           <div className="action-row">
             <button type="button" onClick={() => signIn("google")}>
