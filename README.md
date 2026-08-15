@@ -39,6 +39,9 @@ MASSIVE_API_BASE_URL=https://api.massive.com
 ```
 
 For local development, use `MONGODB_URI`. The app also accepts `MONGO_MONGODB_URI` for Vercel deployments.
+Database-name variables such as `MONGODB_DB_NAME` or `MONGO_MONGODB_DATABASE` must contain only the database name,
+for example `black_scholes_app`. Do not put a MongoDB URI, hostname, or a value containing `.` in the database-name
+variable.
 
 ## Google OAuth setup
 

@@ -42,6 +42,13 @@ type EquityChartPath = {
   name: string;
   path: string;
   color: string;
+  endLabel: {
+    pointX: number;
+    pointY: number;
+    x: number;
+    y: number;
+    value: number;
+  };
 };
 
 const DEFAULT_SYMBOL = "AAPL";
@@ -124,6 +131,7 @@ const formatDate = (value: string) =>
 
 const formatSignedPercent = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 const formatDrawdown = (value: number) => `-${value.toFixed(2)}%`;
+const clampChartLabelY = (value: number, height: number) => Math.min(Math.max(value, 18), height - 12);
 
 function parseNumber(value: string, fallback: number) {
   const parsed = Number(value);
@@ -185,7 +193,7 @@ function buildEquityChart(results: BacktestResult[]) {
   const width = 760;
   const height = 300;
   const padding = 28;
-  const palette = ["#22c4ff", "#67ff8d"];
+  const palette = ["#2563eb", "#16a34a"];
   const allEquities = results.flatMap((result) => result.equityCurve.map((point) => point.equity));
   const minEquity = Math.min(...allEquities);
   const maxEquity = Math.max(...allEquities);
@@ -197,25 +205,39 @@ function buildEquityChart(results: BacktestResult[]) {
 
   const paths: EquityChartPath[] = results.map((result, resultIndex) => {
     const pointStep = longestCurve <= 1 ? 0 : (width - padding * 2) / (longestCurve - 1);
-    const path = result.equityCurve
-      .map((point, pointIndex) => {
-        const x = padding + pointIndex * pointStep;
-        const y = height - padding - ((point.equity - minEquity) / span) * (height - padding * 2);
-        return `${pointIndex === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-      })
+    const coordinates = result.equityCurve.map((point, pointIndex) => {
+      const x = padding + pointIndex * pointStep;
+      const y = height - padding - ((point.equity - minEquity) / span) * (height - padding * 2);
+      return { x, y, value: point.equity };
+    });
+    const path = coordinates
+      .map((point, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
       .join(" ");
+    const endCoordinate = coordinates[coordinates.length - 1] ?? {
+      x: width - padding,
+      y: height - padding,
+      value: result.metrics.endingEquity,
+    };
 
     return {
       id: result.strategy.id,
       name: result.strategy.name,
       path,
       color: palette[resultIndex % palette.length],
+      endLabel: {
+        pointX: endCoordinate.x,
+        pointY: endCoordinate.y,
+        x: endCoordinate.x - 8,
+        y: clampChartLabelY(endCoordinate.y - 10 + resultIndex * 16, height),
+        value: endCoordinate.value,
+      },
     };
   });
 
   return {
     width,
     height,
+    padding,
     paths,
     minEquity,
     maxEquity,
@@ -568,7 +590,7 @@ export function BacktestingDashboard({ user }: { user: UserData }) {
       <section className="hero hero-terminal">
         <div>
           <p className="kicker">Backtesting Engine</p>
-          <h1>Build two trading strategies and test them on long-range Yahoo history.</h1>
+          <h1>Compare trading strategies against long-range history.</h1>
           <p className="hero-copy">
             Compare trend, mean-reversion, breakout, or custom rule sets against buy-and-hold with slippage,
             commissions, drawdown, Sharpe, win rate, and trade-level diagnostics.
@@ -708,6 +730,30 @@ export function BacktestingDashboard({ user }: { user: UserData }) {
                     <div className="chart-shell equity-chart-shell">
                       <svg className="history-chart" viewBox={`0 0 ${equityChart.width} ${equityChart.height}`} role="img">
                         <title>Backtested strategy equity curves</title>
+                        <line
+                          className="chart-grid-line"
+                          x1={equityChart.padding}
+                          x2={equityChart.width - equityChart.padding}
+                          y1={equityChart.padding}
+                          y2={equityChart.padding}
+                        />
+                        <line
+                          className="chart-grid-line"
+                          x1={equityChart.padding}
+                          x2={equityChart.width - equityChart.padding}
+                          y1={equityChart.height - equityChart.padding}
+                          y2={equityChart.height - equityChart.padding}
+                        />
+                        <text x={equityChart.padding} y={equityChart.padding - 6} className="chart-axis-label">
+                          High {formatCurrency(equityChart.maxEquity, result.currency)}
+                        </text>
+                        <text
+                          x={equityChart.padding}
+                          y={equityChart.height - equityChart.padding - 6}
+                          className="chart-axis-label"
+                        >
+                          Low {formatCurrency(equityChart.minEquity, result.currency)}
+                        </text>
                         {equityChart.paths.map((path) => (
                           <path
                             key={path.id}
@@ -718,6 +764,19 @@ export function BacktestingDashboard({ user }: { user: UserData }) {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           />
+                        ))}
+                        {equityChart.paths.map((path) => (
+                          <g key={`${path.id}-value`}>
+                            <circle cx={path.endLabel.pointX} cy={path.endLabel.pointY} r="4" fill={path.color} />
+                            <text
+                              x={path.endLabel.x}
+                              y={path.endLabel.y}
+                              className="chart-value-label"
+                              textAnchor="end"
+                            >
+                              {formatCurrency(path.endLabel.value, result.currency)}
+                            </text>
+                          </g>
                         ))}
                       </svg>
                     </div>

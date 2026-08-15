@@ -11,11 +11,11 @@ export function SiteHeader({ session }: SiteHeaderProps) {
     <header className="site-header">
       <div className="site-header-inner">
         <Link href="/" className="site-brand">
-          BS Pricing Terminal
+          Black-Scholes
         </Link>
 
         <nav className="site-nav">
-          <Link href="/">Dashboard</Link>
+          <Link href="/">Pricing</Link>
           {session?.user ? <Link href="/backtesting">Backtesting</Link> : null}
           {session?.user ? <Link href="/portfolio">Portfolio</Link> : null}
           {session?.user ? <Link href="/profile">Profile</Link> : null}

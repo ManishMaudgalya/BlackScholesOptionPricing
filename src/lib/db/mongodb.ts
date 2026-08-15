@@ -16,6 +16,23 @@ const cache = global.mongooseCache ?? {
 
 global.mongooseCache = cache;
 
+const INVALID_DATABASE_NAME_CHARS = /[./\\ "$]/;
+
+function resolveDatabaseName() {
+  const dbName = (process.env.MONGODB_DB_NAME || process.env.MONGO_MONGODB_DATABASE || "").trim();
+  if (!dbName) {
+    return undefined;
+  }
+
+  if (INVALID_DATABASE_NAME_CHARS.test(dbName)) {
+    throw new Error(
+      "MongoDB database name is invalid. Set MONGODB_DB_NAME or MONGO_MONGODB_DATABASE to only the database name, for example black_scholes_app. Do not use a MongoDB URI, hostname, or a name containing '.', '/', spaces, quotes, '$', or '\\'.",
+    );
+  }
+
+  return dbName;
+}
+
 export async function connectToDatabase() {
   const connectionString = (process.env.MONGODB_URI || process.env.MONGO_MONGODB_URI || "").trim();
   if (!connectionString || connectionString.includes("your_mongodb_connection_string_here")) {
@@ -24,7 +41,7 @@ export async function connectToDatabase() {
     );
   }
 
-  const dbName = process.env.MONGODB_DB_NAME?.trim();
+  const dbName = resolveDatabaseName();
 
   if (cache.connection) {
     return cache.connection;
